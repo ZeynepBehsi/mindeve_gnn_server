@@ -1,0 +1,85 @@
+# ============================================
+# GNN MODELS
+# ============================================
+models:
+  graphsage:
+    enabled: true
+    hidden_channels: 128
+    num_layers: 2
+    dropout: 0.3
+    aggregation: "mean"
+  
+  gat:
+    enabled: true
+    hidden_channels: 128
+    num_layers: 2
+    heads: 8
+    dropout: 0.3
+    attention_dropout: 0.1
+    concat: true
+  
+  gcn:
+    enabled: true
+    hidden_channels: 128
+    num_layers: 2
+    dropout: 0.3
+    add_self_loops: true
+    normalize: true
+
+# ============================================
+# TRAINING
+# ============================================
+training:
+  epochs: 100
+  batch_size: 1024
+  learning_rate: 0.001
+  weight_decay: 0.00001
+  early_stopping:
+    enabled: true
+    patience: 15
+    min_delta: 0.001
+    monitor: "val_auc"
+    mode: "max"
+  balancing:
+    method: "smote_enn"
+    target_ratio: 0.88
+    random_state: 42
+  lr_scheduler:
+    enabled: true
+    warmup:
+      epochs: 5
+      start_factor: 0.1
+    cosine_annealing:
+      t_0: 10
+      t_mult: 2
+      eta_min: 0.000001
+    plateau:
+      factor: 0.5
+      patience: 5
+      min_lr: 0.000001
+
+# ============================================
+# EVALUATION
+# ============================================
+evaluation:
+  metrics:
+    - auc
+    - f1
+    - precision
+    - recall
+    - accuracy
+  use_ground_truth: true
+  ground_truth_metrics:
+    - recall
+    - precision
+
+# ============================================
+# TEST MODE
+# ============================================
+test_mode:
+  enabled: false
+  sample_size: 10000
+  fast_dev_run: true
+  epochs: 10
+  batch_size: 512
+  models_to_test: ["graphsage"]

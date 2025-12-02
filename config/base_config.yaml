@@ -1,0 +1,83 @@
+# ============================================
+# BASE CONFIGURATION
+# ============================================
+project:
+  name: "MindEve-GNN-Server"
+  version: "1.0.0"
+  random_seed: 42
+
+# ============================================
+# DATA PATHS
+# ============================================
+data:
+  local:
+    raw_data_path: "data/sample/2024_05_sample.csv"
+    processed_data_dir: "data/processed"
+    sample_size: 10000
+  
+  server:
+    raw_data_path: "/data/mindeve/raw/2024_05.csv"
+    processed_data_dir: "/data/mindeve/processed"
+    sample_size: null
+  
+  date_range:
+    start: "2024-05-01"
+    end: "2024-05-31"
+  
+  splits:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+# ============================================
+# FEATURES
+# ============================================
+features:
+  clustering_features:
+    - price_deviation
+    - return_rate
+    - transaction_velocity
+    - is_unusual_amount
+    - unique_stores
+    - product_popularity
+    - total_price
+    - is_night_transaction
+    - is_bulk_purchase
+    - avg_transaction_value
+  normalize: true
+  scaler: "standard"
+
+# ============================================
+# GRAPH
+# ============================================
+graph:
+  similarity_threshold: 0.42
+  cooccurrence_min: 2
+  amount_diff_threshold: 0.10
+  max_edges_per_node: 1000
+
+# ============================================
+# LOGGING
+# ============================================
+logging:
+  level: "INFO"
+  log_dir: "outputs/logs"
+  log_to_file: true
+  log_to_console: true
+
+output:
+  models_dir: "outputs/models"
+  figures_dir: "outputs/figures"
+  mlruns_dir: "outputs/mlruns"
+
+# ============================================
+# COMPUTE
+# ============================================
+compute:
+  device: "auto"
+  num_workers: 4
+  pin_memory: true
+  test_mode:
+    enabled: false
+    sample_size: 10000
+    fast_dev_run: true
