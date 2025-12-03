@@ -5,7 +5,7 @@ algorithms:
   kmeans:
     enabled: true
     k_values: [2, 3, 4, 5]
-    init_methods: ["k-means++", "random"]
+    init: "k-means++"
     n_init: 10
     max_iter: 300
     random_state: 42
@@ -13,76 +13,99 @@ algorithms:
   dbscan:
     enabled: true
     eps_values: [0.3, 0.5, 0.7, 1.0]
-    min_samples_values: [10, 20, 50]
+    min_samples: [10, 20, 50]
     metric: "euclidean"
-    n_jobs: -1
   
   isolation_forest:
     enabled: true
-    contamination_values: [0.01, 0.02, 0.05]
-    n_estimators_values: [100, 200]
+    contamination: [0.01, 0.02, 0.05]
+    n_estimators: [100, 200]
     max_samples: "auto"
     random_state: 42
-    n_jobs: -1
   
   gmm:
     enabled: true
-    n_components_values: [2, 3, 4]
-    covariance_types: ["full", "tied"]
+    n_components: [2, 3, 4]
+    covariance_type: ["full", "tied"]
     n_init: 10
     random_state: 42
+
+# ============================================
+# CLUSTERING FEATURES
+# ============================================
+clustering_features:
+  - price_deviation
+  - return_rate
+  - transaction_velocity
+  - is_unusual_amount
+  - unique_stores
+  - product_popularity
+  - total_price
+  - is_night_transaction
+  - is_bulk_purchase
+  - avg_transaction_value
 
 # ============================================
 # VISUALIZATION
 # ============================================
 visualization:
   methods: ["pca", "tsne", "umap", "silhouette"]
+  
   pca:
     n_components: 2
+  
   tsne:
     n_components: 2
     perplexity: 30
     n_iter: 1000
     random_state: 42
     max_samples_test: 5000
+  
   umap:
     n_components: 2
     n_neighbors: 15
     min_dist: 0.1
     random_state: 42
-    max_samples_test: 5000
+  
   silhouette:
     sample_size: 10000
+  
   save_format: "png"
   dpi: 150
 
 # ============================================
-# EVALUATION
+# EVALUATION METRICS
 # ============================================
-evaluation:
-  metrics:
-    - silhouette_score
-    - davies_bouldin_score
-    - calinski_harabasz_score
-  fraud_rate_range:
-    min: 0.005
-    max: 0.05
-  ensemble_weights:
+metrics:
+  - silhouette_score
+  - davies_bouldin_score
+  - calinski_harabasz_score
+
+# ============================================
+# ENSEMBLE CONFIGURATION
+# ============================================
+ensemble:
+  weights:
     kmeans: 0.2
     dbscan: 0.35
     isolation_forest: 0.25
     gmm: 0.2
-  fraud_threshold: 0.4
+  
+  threshold: 0.4
+  
+  fraud_rate_validation:
+    min: 0.005
+    max: 0.05
 
 # ============================================
-# TEST MODE
+# TEST MODE (Clustering-specific)
 # ============================================
 test_mode:
   enabled: false
-  sample_size: 10000
   quick_test:
     kmeans:
       k: 2
+      init: "k-means++"
     dbscan:
       eps: 0.5
       min_samples: 20

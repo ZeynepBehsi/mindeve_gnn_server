@@ -1,80 +1,82 @@
 # ============================================
-# GNN MODELS
+# GNN ARCHITECTURES
 # ============================================
-models:
-  graphsage:
-    enabled: true
+architectures:
+  sage:
     hidden_channels: 128
     num_layers: 2
     dropout: 0.3
     aggregation: "mean"
   
   gat:
-    enabled: true
     hidden_channels: 128
     num_layers: 2
-    heads: 8
     dropout: 0.3
-    attention_dropout: 0.1
-    concat: true
+    num_heads: 8
+    concat: false
   
   gcn:
-    enabled: true
     hidden_channels: 128
     num_layers: 2
     dropout: 0.3
     add_self_loops: true
-    normalize: true
 
 # ============================================
-# TRAINING
+# TRAINING CONFIGURATION
 # ============================================
 training:
-  epochs: 100
+  num_epochs: 100
   batch_size: 1024
   learning_rate: 0.001
-  weight_decay: 0.00001
+  weight_decay: 0.0001
+  
+  # Data balancing
+  data_balancing:
+    enabled: true
+    method: "smote_enn"  # smote_enn, smote, none
+    smote_ratio: 0.88
+  
+  # Learning rate scheduler
+  lr_scheduler:
+    warmup:
+      enabled: true
+      epochs: 5
+      start_lr: 0.0001
+    
+    cosine:
+      enabled: true
+      T_0: 10
+      T_mult: 2
+      eta_min: 0.00001
+    
+    plateau:
+      enabled: true
+      factor: 0.5
+      patience: 10
+      min_lr: 0.00001
+  
+  # Early stopping
   early_stopping:
     enabled: true
     patience: 15
-    min_delta: 0.001
-    monitor: "val_auc"
-    mode: "max"
-  balancing:
-    method: "smote_enn"
-    target_ratio: 0.88
-    random_state: 42
-  lr_scheduler:
-    enabled: true
-    warmup:
-      epochs: 5
-      start_factor: 0.1
-    cosine_annealing:
-      t_0: 10
-      t_mult: 2
-      eta_min: 0.000001
-    plateau:
-      factor: 0.5
-      patience: 5
-      min_lr: 0.000001
+    min_delta: 0.0001
 
 # ============================================
-# EVALUATION
+# EVALUATION CONFIGURATION
 # ============================================
 evaluation:
   metrics:
-    - auc
+    - precision
+    - recall
     - f1
-    - precision
-    - recall
-    - accuracy
-  use_ground_truth: true
-  ground_truth_metrics:
-    - recall
-    - precision
+    - auc
+    - confusion_matrix
+  
+  top_k_precision:
+    k_values: [100, 500, 1000]
 
 # ============================================
-# TEST MODE
+# TEST MODE (GNN-specific)
 # ============================================
 test_mode:
   enabled: false
@@ -82,4 +84,4 @@ test_mode:
   fast_dev_run: true
   epochs: 10
   batch_size: 512
-  models_to_test: ["graphsage"]
+  models_to_test: ["sage"]  # sage, gat, gcn
