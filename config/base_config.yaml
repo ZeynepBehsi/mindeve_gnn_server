@@ -121,3 +121,15 @@ test_mode:
   enabled: false
   sample_size: 10000
   fast_dev_run: true
+
+
+# ============================================================================
+# MLFLOW CONFIGURATION
+# ============================================================================
+mlflow:
+  enabled: true  # Enable/disable MLflow tracking
+  experiment_name: "mindeve_gnn_fraud_detection"
+  tracking_uri: "outputs/mlruns"  # Local tracking (server'da değiştirilebilir)
+  artifact_location: "outputs/mlruns"
+
+  
