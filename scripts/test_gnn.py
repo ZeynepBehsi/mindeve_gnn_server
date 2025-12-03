@@ -10,17 +10,18 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
 from src.utils.config_loader import ConfigLoader
 from src.utils.logger import get_logger
 from src.data.loader import load_data
-from src.data.preprocessor import DataPreprocessor
-from src.labeling.clustering import ClusteringLabeler
+from src.data.preprocessor import FeatureEngineer
+from src.labeling.clustering import ClusteringExperiment
 from src.models.graph_builder import GraphBuilder
 from src.models.gnn_models import GraphSAGE
 from src.training.trainer import GNNTrainer
-from src.training.evaluator import Evaluator
+from src.training.evaluator import GNNEvaluator
 
 def main():
     """Main test function"""
@@ -33,13 +34,15 @@ def main():
     # 1. SETUP
     # ============================================================
     print("\n1️⃣  Loading configs...")
-    config = ConfigLoader.load()
+    config_loader = ConfigLoader()
+    config = config_loader.load_all()  # Load and merge all configs
     
     # Override with test mode
     config['test_mode']['enabled'] = True
     config['test_mode']['sample_size'] = 10000
     
-    logger = get_logger('phase4_gnn', config)
+    # Setup logger with full config
+    logger = get_logger('phase4_gnn', config['logging'])
     
     # Set device
     device = torch.device(
@@ -48,7 +51,7 @@ def main():
     )
     
     # Set seed
-    seed = config['general']['seed']
+    seed = config['project']['random_seed']
     torch.manual_seed(seed)
     np.random.seed(seed)
     print(f"✅ Random seed set to {seed}")
@@ -61,17 +64,41 @@ def main():
     logger.info("Loading data...")
     df = load_data(config)
     
-    logger.info("Preprocessing data...")
-    preprocessor = DataPreprocessor(config)
-    df = preprocessor.preprocess(df)
+    logger.info("Engineering features...")
+    feature_engineer = FeatureEngineer(config)
+    df = feature_engineer.engineer_features(df)
     
     logger.info("Running clustering for labels...")
-    labeler = ClusteringLabeler(config)
-    df = labeler.generate_labels(df)
+    clustering_exp = ClusteringExperiment(config, test_mode=True)
+    clustering_results = clustering_exp.run_all(df)
+    
+    # Get ensemble labels
+    fraud_labels, fraud_scores = clustering_exp.create_ensemble()
+    
+    # Add to dataframe
+    df['fraud_label'] = fraud_labels
+    df['fraud_score'] = fraud_scores
+    
+    print(f"\n  Fraud labels: {fraud_labels.sum():,} / {len(fraud_labels):,} ({fraud_labels.mean()*100:.2f}%)")
     
     logger.info("Building graph...")
     graph_builder = GraphBuilder(config)
-    graph, transaction_mapping, node_mappings = graph_builder.build_graph(df)
+    graph = graph_builder.build_graph(df, fraud_labels)
+    
+    # Create transaction mapping
+    transaction_mapping = df[['cust_id', 'product_code', 'store_code', 'fraud_label', 'fraud_score']].copy()
+    transaction_mapping = transaction_mapping.reset_index(drop=True)
+    
+    # Save processed data
+    output_dir = Path(config['data']['processed_data_path'])
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    torch.save(graph, output_dir / 'hetero_graph.pt')
+    transaction_mapping.to_pickle(output_dir / 'transaction_mapping.pkl')
+    
+    print(f"\n✅ Saved:")
+    print(f"  Graph: {output_dir / 'hetero_graph.pt'}")
+    print(f"  Transaction mapping: {output_dir / 'transaction_mapping.pkl'}")
     
     # ============================================================
     # 3. CREATE SPLITS
@@ -80,8 +107,8 @@ def main():
     
     # Temporal split (70/15/15)
     n_samples = len(transaction_mapping)
-    train_size = int(0.7 * n_samples)
-    val_size = int(0.15 * n_samples)
+    train_size = int(config['data']['splits']['train'] * n_samples)
+    val_size = int(config['data']['splits']['val'] * n_samples)
     
     train_mask = np.zeros(n_samples, dtype=bool)
     val_mask = np.zeros(n_samples, dtype=bool)
@@ -119,12 +146,15 @@ def main():
     model_name = 'GraphSAGE'
     logger.info(f"Training {model_name}...")
     
+    # Get model config
+    model_config = config['architectures']['sage']
+    
     # Initialize model
     model = GraphSAGE(
         in_channels=graph['customer'].x.shape[1],
-        hidden_channels=config['model']['hidden_channels'],
-        num_layers=config['model']['num_layers'],
-        dropout=config['model']['dropout']
+        hidden_channels=model_config['hidden_channels'],
+        num_layers=model_config['num_layers'],
+        dropout=model_config['dropout']
     ).to(device)
     
     # Initialize trainer
@@ -143,14 +173,25 @@ def main():
     # ============================================================
     logger.info("Evaluating model...")
     
-    evaluator = Evaluator(config)
-    results = evaluator.evaluate(
-        model=model,
-        graph=graph.to(device),
-        transaction_mapping=transaction_mapping,
-        test_idx=test_idx,
-        device=device
-    )
+    # Prepare test data
+    test_data = {
+        'customer_idx': transaction_mapping.loc[test_idx, 'cust_id'].map(
+            graph_builder.customer_to_idx
+        ).values,
+        'product_idx': transaction_mapping.loc[test_idx, 'product_code'].map(
+            graph_builder.product_to_idx
+        ).values,
+        'store_idx': transaction_mapping.loc[test_idx, 'store_code'].map(
+            graph_builder.store_to_idx
+        ).values,
+        'labels': test_labels.numpy()
+    }
+    
+    evaluator = GNNEvaluator(config)
+    evaluator.model = model
+    evaluator.device = device
+    
+    results = evaluator.evaluate_full(graph.to(device), test_data)
     
     # Print results
     print("\n" + "="*80)
