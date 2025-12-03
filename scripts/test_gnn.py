@@ -81,13 +81,15 @@ def main():
     
     print(f"\n  Fraud labels: {fraud_labels.sum():,} / {len(fraud_labels):,} ({fraud_labels.mean()*100:.2f}%)")
     
+    # ============================================================
+    # 🔧 FIX: Unpack tuple return from build_graph()
+    # ============================================================
     logger.info("Building graph...")
     graph_builder = GraphBuilder(config)
-    graph = graph_builder.build_graph(df, fraud_labels)
+    graph, transaction_mapping = graph_builder.build_graph(df, fraud_labels)  # ✅ FIXED: Unpack tuple
     
-    # Create transaction mapping
-    transaction_mapping = df[['cust_id', 'product_code', 'store_code', 'fraud_label', 'fraud_score']].copy()
-    transaction_mapping = transaction_mapping.reset_index(drop=True)
+    # Add fraud scores to transaction mapping (already has fraud_label from build_graph)
+    transaction_mapping['fraud_score'] = fraud_scores[transaction_mapping.index]
     
     # Save processed data
     output_dir = Path(config['data']['processed_data_path'])
@@ -146,16 +148,8 @@ def main():
     model_name = 'GraphSAGE'
     logger.info(f"Training {model_name}...")
     
-    # Get model config
-    model_config = config['architectures']['sage']
-    
-    # Initialize model
-    model = GraphSAGE(
-        in_channels=graph['customer'].x.shape[1],
-        hidden_channels=model_config['hidden_channels'],
-        num_layers=model_config['num_layers'],
-        dropout=model_config['dropout']
-    ).to(device)
+    # Initialize model (GraphSAGE only takes config parameter)
+    model = GraphSAGE(config).to(device)
     
     # Initialize trainer
     trainer = GNNTrainer(model, config)
@@ -175,21 +169,14 @@ def main():
     
     # Prepare test data
     test_data = {
-        'customer_idx': transaction_mapping.loc[test_idx, 'cust_id'].map(
-            graph_builder.customer_to_idx
-        ).values,
-        'product_idx': transaction_mapping.loc[test_idx, 'product_code'].map(
-            graph_builder.product_to_idx
-        ).values,
-        'store_idx': transaction_mapping.loc[test_idx, 'store_code'].map(
-            graph_builder.store_to_idx
-        ).values,
+        'customer_idx': transaction_mapping.loc[test_idx, 'customer_idx'].values,
+        'product_idx': transaction_mapping.loc[test_idx, 'product_idx'].values,
+        'store_idx': transaction_mapping.loc[test_idx, 'store_idx'].values,
         'labels': test_labels.numpy()
     }
     
-    evaluator = GNNEvaluator(config)
-    evaluator.model = model
-    evaluator.device = device
+    # Initialize evaluator
+    evaluator = GNNEvaluator(model, device)
     
     results = evaluator.evaluate_full(graph.to(device), test_data)
     
