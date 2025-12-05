@@ -1,0 +1,87 @@
+# ============================================
+# GNN ARCHITECTURES
+# ============================================
+architectures:
+  sage:
+    hidden_channels: 128
+    num_layers: 2
+    dropout: 0.3
+    aggregation: "mean"
+  
+  gat:
+    hidden_channels: 128
+    num_layers: 2
+    dropout: 0.3
+    num_heads: 8
+    concat: false
+  
+  gcn:
+    hidden_channels: 128
+    num_layers: 2
+    dropout: 0.3
+    add_self_loops: true
+
+# ============================================
+# TRAINING CONFIGURATION
+# ============================================
+training:
+  num_epochs: 100
+  batch_size: 1024
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  
+  # Data balancing
+  data_balancing:
+    enabled: true
+    method: "smote_enn"  # smote_enn, smote, none
+    smote_ratio: 0.88
+  
+  # Learning rate scheduler
+  lr_scheduler:
+    warmup:
+      enabled: true
+      epochs: 5
+      start_lr: 0.0001
+    
+    cosine:
+      enabled: true
+      T_0: 10
+      T_mult: 2
+      eta_min: 0.00001
+    
+    plateau:
+      enabled: true
+      factor: 0.5
+      patience: 10
+      min_lr: 0.00001
+  
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 15
+    min_delta: 0.0001
+
+# ============================================
+# EVALUATION CONFIGURATION
+# ============================================
+evaluation:
+  metrics:
+    - precision
+    - recall
+    - f1
+    - auc
+    - confusion_matrix
+  
+  top_k_precision:
+    k_values: [100, 500, 1000]
+
+# ============================================
+# TEST MODE (GNN-specific)
+# ============================================
+test_mode:
+  enabled: false
+  sample_size: 10000
+  fast_dev_run: true
+  epochs: 10
+  batch_size: 512
+  models_to_test: ["sage"]  # sage, gat, gcn

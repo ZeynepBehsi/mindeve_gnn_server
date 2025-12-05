@@ -1,0 +1,232 @@
+# ============================================================
+# CLUSTERING CONFIGURATION
+# Unsupervised fraud labeling via ensemble clustering
+# ============================================================
+
+# Random seed for reproducibility
+random_seed: 42
+
+# Feature selection for clustering
+features:
+  # Features used for clustering (must exist after preprocessing)
+  clustering_features:
+    - price_deviation
+    - return_rate
+    - transaction_velocity
+    - is_unusual_amount
+    - unique_stores
+    - product_popularity
+    - total_price
+    - is_night_transaction
+    - is_bulk_purchase
+    - avg_transaction_value
+    # NEW: Discount-based features
+    - discount_rate
+    - has_campaign
+    - is_high_discount
+    - customer_discount_rate
+    - product_discount_frequency
+  
+  # Feature scaling method
+  scaler: "standard"  # Options: standard, minmax, robust
+
+# Ensemble voting configuration
+ensemble:
+  # Voting threshold (fraction of algorithms that must agree)
+  # Lower threshold = more sensitive (more fraud detected)
+  threshold: 0.3  # 30% agreement (was 0.4)
+  
+  # Fraud rate validation bounds
+  fraud_rate_validation:
+    min: 0.01  # 1% minimum fraud rate (was 0.10)
+    max: 0.15  # 15% maximum fraud rate (was 0.50)
+  
+  # Weights for each algorithm (optional, equal if not specified)
+  algorithm_weights:
+    kmeans: 1.0
+    dbscan: 1.0
+    isolation_forest: 1.5  # Higher weight for anomaly detection
+    gmm: 1.0
+
+# Algorithm configurations
+algorithms:
+  # K-Means Clustering
+  kmeans:
+    enabled: true
+    configs:
+      - k: 2
+        init: "k-means++"
+        max_iter: 300
+        n_init: 10
+      - k: 3
+        init: "k-means++"
+        max_iter: 300
+        n_init: 10
+      - k: 4
+        init: "k-means++"
+        max_iter: 300
+        n_init: 10
+    
+    # How to determine fraud cluster
+    fraud_detection_method: "minority"  # Options: minority, high_anomaly_score
+    
+    # Metrics to compute
+    metrics:
+      - silhouette
+      - calinski_harabasz
+      - davies_bouldin
+  
+  # DBSCAN (Density-Based Spatial Clustering)
+  dbscan:
+    enabled: true
+    configs:
+      - eps: 0.3
+        min_samples: 10
+        metric: "euclidean"
+      - eps: 0.5
+        min_samples: 20
+        metric: "euclidean"
+      - eps: 0.7
+        min_samples: 30
+        metric: "euclidean"
+    
+    # Noise points (-1 label) treatment
+    noise_as_fraud: true  # Treat noise points as potential fraud
+    
+    # Metrics
+    metrics:
+      - silhouette
+      - n_clusters
+      - noise_ratio
+  
+  # Isolation Forest (Anomaly Detection)
+  isolation_forest:
+    enabled: true
+    configs:
+      - contamination: 0.01  # 1% expected fraud
+        n_estimators: 100
+        max_samples: "auto"
+        random_state: 42
+      - contamination: 0.03  # 3% expected fraud
+        n_estimators: 200
+        max_samples: "auto"
+        random_state: 42
+      - contamination: 0.05  # 5% expected fraud
+        n_estimators: 150
+        max_samples: "auto"
+        random_state: 42
+    
+    # Anomaly label: -1 = anomaly (fraud), 1 = normal
+    anomaly_label: -1
+    
+    # Metrics
+    metrics:
+      - contamination_rate
+  
+  # Gaussian Mixture Model
+  gmm:
+    enabled: true
+    configs:
+      - n_components: 2
+        covariance_type: "full"
+        max_iter: 100
+        n_init: 10
+        random_state: 42
+      - n_components: 3
+        covariance_type: "full"
+        max_iter: 100
+        n_init: 10
+        random_state: 42
+      - n_components: 2
+        covariance_type: "diag"
+        max_iter: 100
+        n_init: 10
+        random_state: 42
+    
+    # How to determine fraud cluster
+    fraud_detection_method: "minority"  # Options: minority, lowest_probability
+    
+    # Metrics
+    metrics:
+      - silhouette
+      - bic
+      - aic
+
+# Experiment settings
+experiment:
+  # Save experiment results
+  save_results: true
+  results_path: "data/clustering_results"
+  
+  # Visualization settings
+  visualizations:
+    enabled: true
+    output_dir: "EDA/visualizations/clustering"
+    
+    # Types of plots to generate
+    plots:
+      - cluster_distribution
+      - feature_importance
+      - silhouette_analysis
+      - confusion_matrix  # If ground truth available
+  
+  # MLflow tracking
+  mlflow:
+    enabled: true
+    experiment_name: "mindeve_clustering"
+    
+    # What to log
+    log_params: true
+    log_metrics: true
+    log_artifacts: true
+
+# Test mode (quick experiments)
+test_mode:
+  enabled: false
+  
+  # Limit number of configs per algorithm
+  max_configs_per_algorithm: 1
+  
+  # Sample size for testing
+  sample_size: 1000
+
+# Performance optimization
+performance:
+  # Number of parallel jobs (-1 = all cores)
+  n_jobs: -1
+  
+  # Verbose output level (0-3)
+  verbose: 1
+  
+  # Memory optimization
+  low_memory: false
+
+# Validation settings
+validation:
+  # If ground truth labels are available
+  ground_truth_available: false
+  ground_truth_column: "is_fraud"
+  
+  # Cross-validation for stability
+  cross_validation:
+    enabled: false
+    n_splits: 5
+    
+  # Stability analysis (run multiple times)
+  stability_analysis:
+    enabled: false
+    n_runs: 5
+
+# Output settings
+output:
+  # Save cluster labels
+  save_labels: true
+  labels_path: "data/processed/cluster_labels.pkl"
+  
+  # Save cluster statistics
+  save_statistics: true
+  statistics_path: "data/processed/cluster_statistics.json"
+  
+  # Save best configuration
+  save_best_config: true
+  best_config_path: "data/processed/best_clustering_config.yaml"

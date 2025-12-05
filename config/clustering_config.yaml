@@ -1,0 +1,226 @@
+# ============================================================
+# CLUSTERING CONFIGURATION
+# Unsupervised fraud labeling via ensemble clustering
+# ============================================================
+
+# Random seed for reproducibility
+random_seed: 42
+
+# Feature selection for clustering
+features:
+  # Features used for clustering (must exist after preprocessing)
+  clustering_features:
+    - price_deviation
+    - return_rate
+    - transaction_velocity
+    - is_unusual_amount
+    - unique_stores
+    - product_popularity
+    - total_price
+    - is_night_transaction
+    - is_bulk_purchase
+    - avg_transaction_value
+    - discount_rate
+    - has_campaign
+    - is_high_discount
+    - customer_discount_rate
+    - product_discount_frequency
+  
+  # Feature scaling method
+  scaler: "standard"
+
+# Ensemble voting configuration
+ensemble:
+  # Voting threshold (fraction of algorithms that must agree)
+  threshold: 0.3
+  
+  # Fraud rate validation bounds
+  fraud_rate_validation:
+    min: 0.01
+    max: 0.15
+  
+  # Weights for each algorithm
+  algorithm_weights:
+    kmeans: 1.0
+    dbscan: 1.0
+    isolation_forest: 1.5
+    gmm: 1.0
+
+# Algorithm configurations
+algorithms:
+  # K-Means Clustering
+  kmeans:
+    enabled: true
+    configs:
+      - k: 2
+        init: "k-means++"
+        max_iter: 300
+        n_init: 10
+      - k: 3
+        init: "k-means++"
+        max_iter: 300
+        n_init: 10
+      - k: 4
+        init: "k-means++"
+        max_iter: 300
+        n_init: 10
+    
+    fraud_detection_method: "minority"
+    
+    metrics:
+      - silhouette
+      - calinski_harabasz
+      - davies_bouldin
+  
+  # DBSCAN
+  dbscan:
+    enabled: true
+    configs:
+      - eps: 0.3
+        min_samples: 10
+        metric: "euclidean"
+      - eps: 0.5
+        min_samples: 20
+        metric: "euclidean"
+      - eps: 0.7
+        min_samples: 30
+        metric: "euclidean"
+    
+    noise_as_fraud: true
+    
+    metrics:
+      - silhouette
+      - n_clusters
+      - noise_ratio
+  
+  # Isolation Forest
+  isolation_forest:
+    enabled: true
+    configs:
+      - contamination: 0.01
+        n_estimators: 100
+        max_samples: "auto"
+        random_state: 42
+      - contamination: 0.03
+        n_estimators: 200
+        max_samples: "auto"
+        random_state: 42
+      - contamination: 0.05
+        n_estimators: 150
+        max_samples: "auto"
+        random_state: 42
+    
+    anomaly_label: -1
+    
+    metrics:
+      - contamination_rate
+  
+  # Gaussian Mixture Model
+  gmm:
+    enabled: true
+    configs:
+      - n_components: 2
+        covariance_type: "full"
+        max_iter: 100
+        n_init: 10
+        random_state: 42
+      - n_components: 3
+        covariance_type: "full"
+        max_iter: 100
+        n_init: 10
+        random_state: 42
+      - n_components: 2
+        covariance_type: "diag"
+        max_iter: 100
+        n_init: 10
+        random_state: 42
+    
+    fraud_detection_method: "minority"
+    
+    metrics:
+      - silhouette
+      - bic
+      - aic
+
+# Experiment settings
+experiment:
+  save_results: true
+  results_path: "data/clustering_results"
+  
+  visualizations:
+    enabled: true
+    output_dir: "EDA/visualizations/clustering"
+    
+    plots:
+      - cluster_distribution
+      - feature_importance
+      - silhouette_analysis
+      - confusion_matrix
+  
+  mlflow:
+    enabled: true
+    experiment_name: "mindeve_clustering"
+    log_params: true
+    log_metrics: true
+    log_artifacts: true
+
+# Test mode
+test_mode:
+  enabled: false
+  max_configs_per_algorithm: 1
+  sample_size: 1000
+  
+  quick_test:
+    kmeans:
+      k: 2
+      init: "k-means++"
+      max_iter: 300
+      n_init: 10
+    
+    dbscan:
+      eps: 0.5
+      min_samples: 20
+      metric: "euclidean"
+    
+    isolation_forest:
+      contamination: 0.02
+      n_estimators: 100
+      max_samples: "auto"
+      random_state: 42
+    
+    gmm:
+      n_components: 2
+      covariance_type: "full"
+      max_iter: 100
+      n_init: 10
+      random_state: 42
+
+# Performance optimization
+performance:
+  n_jobs: -1
+  verbose: 1
+  low_memory: false
+
+# Validation settings
+validation:
+  ground_truth_available: false
+  ground_truth_column: "is_fraud"
+  
+  cross_validation:
+    enabled: false
+    n_splits: 5
+  
+  stability_analysis:
+    enabled: false
+    n_runs: 5
+
+# Output settings
+output:
+  save_labels: true
+  labels_path: "data/processed/cluster_labels.pkl"
+  
+  save_statistics: true
+  statistics_path: "data/processed/cluster_statistics.json"
+  
+  save_best_config: true
+  best_config_path: "data/processed/best_clustering_config.yaml"

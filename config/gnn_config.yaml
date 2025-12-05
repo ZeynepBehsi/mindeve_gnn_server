@@ -1,0 +1,306 @@
+# ============================================================
+# GNN MODEL CONFIGURATION
+# Graph Neural Network training for fraud detection
+# ============================================================
+
+# Random seed
+random_seed: 42
+
+# Model architecture
+model:
+  type: "GraphSAGE"  # Options: GraphSAGE, GAT, GCN
+  
+  # Hidden dimensions
+  hidden_channels: 64
+  num_layers: 2
+  
+  # Aggregation method for GraphSAGE
+  aggr: "mean"  # Options: mean, max, sum
+  
+  # Dropout for regularization
+  dropout: 0.3
+  
+  # Activation function
+  activation: "relu"  # Options: relu, leaky_relu, elu
+  
+  # Output dimension (binary classification)
+  out_channels: 2
+
+# Training configuration
+training:
+  # Number of epochs
+  num_epochs: 50  # Increased from 10 (low fraud rate needs more training)
+  
+  # Batch size
+  batch_size: 1024  # Increased from 512 (larger batches for stability)
+  
+  # Learning rate
+  learning_rate: 0.001
+  
+  # Learning rate scheduler
+  lr_scheduler:
+    enabled: true
+    type: "cosine_with_warmup"  # Options: cosine_with_warmup, step, exponential
+    
+    # Warmup configuration
+    warmup:
+      epochs: 5
+      start_lr: 0.0001
+      end_lr: 0.001
+    
+    # Cosine annealing
+    cosine:
+      T_max: 40
+      eta_min: 0.00001
+    
+    # Warm restarts
+    warm_restarts:
+      enabled: true
+      T_0: 10
+      T_mult: 2
+  
+  # Optimizer
+  optimizer:
+    type: "Adam"
+    weight_decay: 0.0001
+    
+    # Optional: AdamW parameters
+    amsgrad: false
+    betas: [0.9, 0.999]
+  
+  # Loss function
+  loss:
+    type: "focal"  # Options: focal, cross_entropy, weighted_cross_entropy
+    
+    # Focal loss parameters (for extreme class imbalance)
+    focal:
+      alpha: 0.75  # Weight for positive class (fraud)
+      gamma: 3.0   # Focusing parameter (increased from 2.0)
+    
+    # Class weights (if using weighted_cross_entropy)
+    class_weights:
+      normal: 1.0
+      fraud: 30.0  # Increased from 20.0 (for lower fraud rate)
+  
+  # Data balancing
+  data_balancing:
+    enabled: true
+    method: "smote_enn"  # Options: smote, smote_enn, adasyn, none
+    
+    # SMOTE parameters
+    smote:
+      sampling_strategy: 0.50  # Increased from 0.30 (more aggressive balancing)
+      k_neighbors: 5
+      random_state: 42
+    
+    # ENN (Edited Nearest Neighbors) for cleaning
+    enn:
+      n_neighbors: 3
+      kind_sel: "all"
+  
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 15
+    min_delta: 0.001
+    monitor: "val_loss"  # Options: val_loss, val_f1, val_auc
+    mode: "min"  # Options: min, max
+  
+  # Gradient clipping
+  gradient_clipping:
+    enabled: true
+    max_norm: 1.0
+  
+  # Mixed precision training (for GPU)
+  mixed_precision:
+    enabled: true
+    
+# Data splits
+data:
+  # Train/val/test split ratios
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  
+  # Stratified split (maintain fraud ratio)
+  stratified: true
+  
+  # Temporal split (if using time-based validation)
+  temporal_split:
+    enabled: false
+    date_column: "trans_date"
+    train_end_date: "2024-03-31"
+    val_end_date: "2024-04-30"
+
+# Graph construction
+graph:
+  # Node types
+  node_types:
+    - customer
+    - product
+    - store
+  
+  # Edge types
+  edge_types:
+    - [customer, buys, product]
+    - [customer, visits, store]
+    - [product, sold_at, store]
+  
+  # Neighbor sampling for mini-batch training
+  neighbor_sampling:
+    enabled: true
+    num_neighbors: [10, 5]  # Per layer: [layer1, layer2]
+    
+    # For large graphs
+    fanout: [15, 10]  # Alternative sampling strategy
+  
+  # Node feature engineering
+  node_features:
+    customer:
+      - customer_transaction_count
+      - customer_total_spending
+      - avg_transaction_value
+      - customer_unique_products
+      - unique_stores
+      - return_rate
+      - transaction_velocity
+      - customer_discount_rate
+      - customer_campaign_rate
+    
+    product:
+      - product_popularity
+      - product_avg_price
+      - product_unique_customers
+      - product_discount_frequency
+    
+    store:
+      - store_transaction_count
+      - store_unique_customers
+      - store_avg_transaction_value
+
+# Evaluation metrics
+evaluation:
+  metrics:
+    - precision
+    - recall
+    - f1
+    - auc
+    - accuracy
+    - confusion_matrix
+  
+  # Top-K precision (for ranking)
+  top_k_precision:
+    enabled: true
+    k_values: [100, 500, 1000]
+  
+  # Threshold tuning
+  threshold_tuning:
+    enabled: true
+    method: "f1_optimal"  # Options: f1_optimal, precision_recall_curve
+    
+# MLflow tracking
+mlflow:
+  enabled: true
+  experiment_name: "mindeve_gnn_fraud_detection"
+  
+  # What to log
+  log_params: true
+  log_metrics: true
+  log_model: true
+  log_artifacts: true
+  
+  # Artifact paths
+  artifacts:
+    - "data/processed/hetero_graph.pt"
+    - "config/gnn_config.yaml"
+
+# Model checkpointing
+checkpointing:
+  enabled: true
+  save_dir: "models/checkpoints"
+  
+  # Save best model
+  save_best: true
+  monitor: "val_f1"  # Options: val_loss, val_f1, val_auc
+  mode: "max"  # Options: min, max
+  
+  # Save frequency
+  save_every_n_epochs: 5
+  
+  # Keep only best N checkpoints
+  keep_top_k: 3
+
+# Inference configuration
+inference:
+  # Batch size for inference
+  batch_size: 2048
+  
+  # Device
+  device: "cuda"  # Options: cuda, cpu
+  
+  # Threshold for fraud classification
+  threshold: 0.5
+  
+  # Risk scoring
+  risk_scoring:
+    enabled: true
+    method: "probability"  # Options: probability, anomaly_score
+
+# Explainability
+explainability:
+  enabled: false
+  methods:
+    - "attention_weights"  # For GAT
+    - "gnnexplainer"
+    - "integrated_gradients"
+
+# Hardware settings
+hardware:
+  device: "cuda"  # Options: cuda, cpu, mps (for Mac)
+  
+  # Multi-GPU training
+  multi_gpu:
+    enabled: false
+    strategy: "ddp"  # Options: ddp, dp
+    
+  # Number of workers for data loading
+  num_workers: 4
+  
+  # Pin memory for faster GPU transfer
+  pin_memory: true
+
+# Test mode
+test_mode:
+  enabled: false
+  
+  # Quick training settings
+  quick_settings:
+    num_epochs: 10
+    batch_size: 512
+    sample_size: 10000
+
+# Validation settings
+validation:
+  # Validation frequency (every N epochs)
+  validate_every: 1
+  
+  # Validation metrics to track
+  track_metrics:
+    - val_loss
+    - val_f1
+    - val_auc
+    - val_precision
+    - val_recall
+
+# Production settings
+production:
+  # Model serving
+  serving:
+    enabled: false
+    port: 8000
+    
+  # Monitoring
+  monitoring:
+    enabled: false
+    log_predictions: true
+    alert_threshold: 0.9

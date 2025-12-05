@@ -1,0 +1,30 @@
+{
+  "common_columns": [],
+  "removed_columns": [
+    "AMOUNT",
+    "BARCODE",
+    "CUST_ID",
+    "PRODUCT_CODE",
+    "STORE_CODE",
+    "TRANS_DATE",
+    "TRANS_ID",
+    "UNIT_PRICE"
+  ],
+  "new_columns": [
+    "amount",
+    "barcode",
+    "cust_id",
+    "discounted_total_price",
+    "discounted_unit_price",
+    "no_discount",
+    "product_code",
+    "store_code",
+    "total_discount_amount",
+    "trans_date",
+    "trans_id",
+    "unit_campaign_discount",
+    "unit_price"
+  ],
+  "total_old": 8,
+  "total_new": 13
+}

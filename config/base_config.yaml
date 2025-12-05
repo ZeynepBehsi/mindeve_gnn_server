@@ -1,0 +1,137 @@
+# ============================================
+# PROJECT INFORMATION
+# ============================================
+project:
+  name: "MindEve-GNN-Server"
+  version: "1.0.0"
+  description: "Fraud Detection with Graph Neural Networks"
+  random_seed: 42
+
+
+# ============================================
+# DATA CONFIGURATION - yeni veri setine göre güncelledim
+# ============================================
+data:
+  raw_data_path: "data/raw/Copy of combined_sales_2022-2025_filtered_more_than_6_transactions.csv"
+  processed_data_path: "data/processed"
+  sample_data_path: "data/sample/2024_05_sample.csv"
+  splits_path: "data/splits"
+  
+  # Column mappings (now handled in loader)
+  column_mapping:
+    trans_id: "trans_id"
+    trans_date: "trans_date"
+    store_code: "store_code"
+    cust_id: "cust_id"
+    product_code: "product_code"
+    barcode: "barcode"
+    amount: "amount"
+    unit_price: "unit_price"
+  
+  # Data types (already optimized in loader)
+  dtypes:
+    trans_id: "int64"
+    store_code: "int32"
+    cust_id: "int64"
+    product_code: "int64"
+    barcode: "int64"
+    amount: "int32"
+  
+  # Date range (UPDATED FOR NEW DATASET)
+  date_range:
+    start: "2022-01-01"
+    end: "2025-12-31"
+  
+  # Train/val/test split ratios
+  splits:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  
+  # Environment-specific overrides
+  local_config:
+    raw_data_path: "data/sample/2024_05_sample.csv"
+    sample_size: 10000
+  
+  server_config:
+    raw_data_path: "/data/mindeve/raw/2024_05.csv"
+    processed_data_path: "/data/mindeve/processed"
+    sample_size: null
+
+# ============================================
+# FEATURE ENGINEERING
+# ============================================
+features:
+  # Features used for clustering
+  clustering_features:
+    - price_deviation
+    - return_rate
+    - transaction_velocity
+    - is_unusual_amount
+    - unique_stores
+    - product_popularity
+    - total_price
+    - is_night_transaction
+    - is_bulk_purchase
+    - avg_transaction_value
+  
+  # Feature normalization
+  normalize: true
+  scaler: "standard"
+
+# ============================================
+# GRAPH CONSTRUCTION
+# ============================================
+graph_construction:
+  similarity_threshold: 0.42
+  cooccurrence_min: 2
+  amount_diff_threshold: 0.10
+  max_edges_per_node: 1000
+
+# ============================================
+# LOGGING
+# ============================================
+logging:
+  level: "INFO"
+  log_dir: "outputs/logs"
+  log_to_file: true
+  log_to_console: true
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ============================================
+# OUTPUT PATHS
+# ============================================
+output:
+  models_dir: "outputs/models"
+  figures_dir: "outputs/figures"
+  mlruns_dir: "outputs/mlruns"
+  reports_dir: "reports"
+
+# ============================================
+# COMPUTE SETTINGS
+# ============================================
+compute:
+  device: "cuda"  # auto, cuda, cpu --> server'a geçince cuda yap
+  num_workers: 4
+  pin_memory: true
+
+# ============================================
+# TEST MODE (Global)
+# ============================================
+test_mode:
+  enabled: false  # false for full dataset
+  sample_size: 100000  # 100K for testing
+  fast_dev_run: false
+
+
+# ============================================================================
+# MLFLOW CONFIGURATION
+# ============================================================================
+mlflow:
+  enabled: true  # Enable/disable MLflow tracking
+  experiment_name: "mindeve_gnn_fraud_detection"
+  tracking_uri: "outputs/mlruns"  # Local tracking (server'da değiştirilebilir)
+  artifact_location: "outputs/mlruns"
+
+
+
