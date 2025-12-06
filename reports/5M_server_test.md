@@ -1,12 +1,48 @@
 # MINDEVE GNN Fraud Detection - 5M Test Raporu
 
-## Yönetici Özeti
+## Özet
 
 5 milyon perakende işlem verisi üzerinde heterogeneous Graph Neural Networks (GNN) kullanılarak büyük ölçekli dolandırıcılık tespiti başarıyla tamamlandı. Sistem %97.38 AUC-ROC ve %93.39 recall elde etti, en yüksek riskli 100 işlemde %89 precision ile olağanüstü performans gösterdi. Eğitim NVIDIA RTX 2080 Ti GPU üzerinde 4.5 saatte tamamlandı.
+
+### Metrik Özeti (Hızlı Referans)
+```
+📊 5M TEST - HIZLI ÖZET
+═══════════════════════════════════════
+
+Veri:        5,000,000 transactions
+Graph:       508,368 nodes, 10,131,754 edges
+Training:    4.5 saat, 15 epochs
+
+SONUÇLAR:
+─────────────────────────────────────
+AUC-ROC:     97.38% 🌟🌟🌟
+Recall:      93.39% 🌟🌟🌟
+Precision:    8.87% ⚠️
+F1-Score:    16.21% ⚠️
+
+TOP-K:
+─────────────────────────────────────
+Top-100:     89.0% 🔥🔥🔥
+Top-500:     84.4% 🔥🔥
+Top-1000:    82.4% 🔥
+
+CONFUSION MATRIX:
+─────────────────────────────────────
+TP: 6,511  |  FN: 461
+FP: 66,868 |  TN: 620,203
+
+CLUSTERING:
+─────────────────────────────────────
+Best: GMM (Silhouette: 0.88)
+Fraud Rate: 0.13% → 1.00% (SMOTE)
+
+```
+
 
 **Test Tarihi:** 5-6 Aralık 2025  
 **Veri Seti Boyutu:** 5,000,000 işlem  
 **Model:** HeteroGNN (GraphSAGE)  
+**Son Güncelleme:** 6 Aralık 2025, 08:30
 **Durum:** Tamamlandı
 
 ---
@@ -566,47 +602,6 @@ mindeve_gnn_server-main/
     └── processed/
 ```
 
-### 12.3 Metrik Özeti (Hızlı Referans)
-```
-📊 5M TEST - HIZLI ÖZET
-═══════════════════════════════════════
-
-Veri:        5,000,000 transactions
-Graph:       508,368 nodes, 10,131,754 edges
-Training:    4.5 saat, 15 epochs
-
-SONUÇLAR:
-─────────────────────────────────────
-AUC-ROC:     97.38% 🌟🌟🌟
-Recall:      93.39% 🌟🌟🌟
-Precision:    8.87% ⚠️
-F1-Score:    16.21% ⚠️
-
-TOP-K:
-─────────────────────────────────────
-Top-100:     89.0% 🔥🔥🔥
-Top-500:     84.4% 🔥🔥
-Top-1000:    82.4% 🔥
-
-CONFUSION MATRIX:
-─────────────────────────────────────
-TP: 6,511  |  FN: 461
-FP: 66,868 |  TN: 620,203
-
-CLUSTERING:
-─────────────────────────────────────
-Best: GMM (Silhouette: 0.88)
-Fraud Rate: 0.13% → 1.00% (SMOTE)
-
-```
-
----
-
-
-**Proje Deposu:** GitHub - mindeve_gnn_server  
-**Rapor Tarihi:** 6 Aralık 2025  
-**Rapor Versiyonu:** 2.0  
-**Son Güncelleme:** 6 Aralık 2025, 08:30
 
 ---
 
