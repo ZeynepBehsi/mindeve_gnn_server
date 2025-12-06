@@ -26,6 +26,28 @@ model:
   # Output dimension (binary classification)
   out_channels: 2
 
+# Model architecture configurations (for different GNN types)
+architectures:
+  sage:
+    hidden_channels: 64
+    num_layers: 2
+    dropout: 0.3
+    aggregation: "mean"  # Options: mean, max, sum
+  
+  gat:
+    hidden_channels: 64
+    num_layers: 2
+    dropout: 0.3
+    num_heads: 8
+    concat: false
+  
+  gcn:
+    hidden_channels: 64
+    num_layers: 2
+    dropout: 0.3
+    add_self_loops: true
+
+
 # Training configuration
 training:
   # Number of epochs

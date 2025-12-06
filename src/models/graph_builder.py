@@ -23,7 +23,7 @@ class GraphBuilder:
     def __init__(self, config: dict):
         self.config = config
     
-    def build_graph(self, df: pd.DataFrame, fraud_labels: np.ndarray) -> Tuple[HeteroData, Dict]:
+    def build_graph(self, df: pd.DataFrame, fraud_labels: np.ndarray) -> Tuple[HeteroData, pd.DataFrame]:
         """
         Build heterogeneous graph from transaction data
         
@@ -213,9 +213,10 @@ class GraphBuilder:
         # Convert to tensor
         return torch.FloatTensor(features.values)
     
+
     def _create_edges(self, df: pd.DataFrame) -> Dict[Tuple[str, str, str], torch.Tensor]:
         """
-        Create edge indices for all edge types
+        Create edge indices for all edge types (including reverse edges)
         
         Args:
             df: DataFrame with node index columns
@@ -226,32 +227,45 @@ class GraphBuilder:
         
         edge_index_dict = {}
         
-        # Customer-Product edges (buys)
+        # Customer-Product edges (buys) + Reverse
         customer_product = df[['customer_idx', 'product_idx']].drop_duplicates()
         edge_index_dict[('customer', 'buys', 'product')] = torch.LongTensor([
             customer_product['customer_idx'].values,
             customer_product['product_idx'].values
         ])
+        edge_index_dict[('product', 'bought_by', 'customer')] = torch.LongTensor([
+            customer_product['product_idx'].values,
+            customer_product['customer_idx'].values
+        ])
         print(f"    Customer-Product: {customer_product.shape[0]:,}")
         
-        # Customer-Store edges (visits)
+        # Customer-Store edges (visits) + Reverse
         customer_store = df[['customer_idx', 'store_idx']].drop_duplicates()
         edge_index_dict[('customer', 'visits', 'store')] = torch.LongTensor([
             customer_store['customer_idx'].values,
             customer_store['store_idx'].values
         ])
+        edge_index_dict[('store', 'visited_by', 'customer')] = torch.LongTensor([
+            customer_store['store_idx'].values,
+            customer_store['customer_idx'].values
+        ])
         print(f"    Customer-Store: {customer_store.shape[0]:,}")
         
-        # Product-Store edges (sold_at)
+        # Product-Store edges (sold_at) + Reverse
         product_store = df[['product_idx', 'store_idx']].drop_duplicates()
         edge_index_dict[('product', 'sold_at', 'store')] = torch.LongTensor([
             product_store['product_idx'].values,
             product_store['store_idx'].values
         ])
+        edge_index_dict[('store', 'sells', 'product')] = torch.LongTensor([
+            product_store['store_idx'].values,
+            product_store['product_idx'].values
+        ])
         print(f"    Product-Store: {product_store.shape[0]:,}")
         
         return edge_index_dict
-    
+
+
     def _assemble_graph(
         self,
         customer_features: torch.Tensor,
@@ -292,7 +306,8 @@ class GraphBuilder:
         
         return graph
     
-    def _create_transaction_mapping(self, df: pd.DataFrame) -> Dict:
+
+    def _create_transaction_mapping(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Create mapping from transactions to graph nodes
         
@@ -300,24 +315,22 @@ class GraphBuilder:
             df: Transaction dataframe
         
         Returns:
-            Dictionary with transaction-to-node mappings
+            DataFrame with transaction-to-node mappings
         """
         
-        mapping = {
+        # Create DataFrame with essential columns
+        mapping_df = pd.DataFrame({
             'trans_id': df['trans_id'].values if 'trans_id' in df.columns else np.arange(len(df)),
             'customer_idx': df['customer_idx'].values,
             'product_idx': df['product_idx'].values,
             'store_idx': df['store_idx'].values,
-            'fraud_label': df['fraud_label'].values,
-            'num_transactions': len(df),
-            'num_customers': df['customer_idx'].nunique(),
-            'num_products': df['product_idx'].nunique(),
-            'num_stores': df['store_idx'].nunique()
-        }
+            'fraud_label': df['fraud_label'].values
+        })
         
-        return mapping
+        return mapping_df
+
     
-    def _save_graph(self, graph: HeteroData, transaction_mapping: Dict):
+    def _save_graph(self, graph: HeteroData, transaction_mapping: pd.DataFrame):
         """Save graph and mapping to disk"""
         
         # Get save paths from config

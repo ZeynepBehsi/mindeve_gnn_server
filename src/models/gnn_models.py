@@ -17,16 +17,25 @@ class HeteroGNN(nn.Module):
         self.config = config
         self.conv_type = conv_type
         
-        # Model config
-        model_config = config['architectures'][conv_type]
+        # Model config - Support both old and new config structure
+        if 'architectures' in config and conv_type in config['architectures']:
+            # New structure: config['architectures']['sage']
+            model_config = config['architectures'][conv_type]
+        elif 'model' in config:
+            # Old structure: config['model'] (backward compatibility)
+            model_config = config['model']
+            print(f"⚠️  Using legacy config structure. Consider adding 'architectures' section.")
+        else:
+            raise KeyError(f"Neither 'architectures.{conv_type}' nor 'model' found in config!")
+        
         self.hidden_channels = model_config['hidden_channels']
         self.num_layers = model_config['num_layers']
         self.dropout = model_config['dropout']
         
         # Input projections
-        self.customer_proj = nn.Linear(6, self.hidden_channels)  # 6 customer features
+        self.customer_proj = nn.Linear(9, self.hidden_channels)  # 9 customer features - yeni veri seti ile birlikte 9 oldu.
         self.product_proj = nn.Linear(4, self.hidden_channels)   # 4 product features
-        self.store_proj = nn.Linear(3, self.hidden_channels)     # 3 store features
+        self.store_proj = nn.Linear(4, self.hidden_channels)     # 4 store features
         
         # Graph convolutions
         self.convs = nn.ModuleList()
