@@ -181,6 +181,7 @@ class GraphBuilder:
         # Convert to tensor
         return torch.FloatTensor(features.values)
     
+    
     def _create_store_features(self, df: pd.DataFrame) -> torch.Tensor:
         """
         Create store node features from transaction data
@@ -189,18 +190,36 @@ class GraphBuilder:
             df: DataFrame with store_idx column
         
         Returns:
-            Tensor of store features [num_stores, num_features]
+            Tensor of store features [num_stores, 4]
+            Features: [total_price_sum, total_price_mean, unique_customers, unique_products]
         """
         
         # Check if we have multiple stores
         num_stores = df['store_code'].nunique()
         
         if num_stores == 1:
-            # Single store: create dummy features
-            print(f"    ⚠️  Single store detected, using dummy features")
-            return torch.FloatTensor([[1.0, 1.0, 1.0]])
+            # Single store: create 4 meaningful features to match model expectation
+            print(f"    ⚠️  Single store detected, creating 4D features")
+            
+            total_trans = len(df)
+            avg_price = df['total_price'].mean() if 'total_price' in df.columns else 1.0
+            unique_customers = df['customer_idx'].nunique()
+            unique_products = df['product_idx'].nunique()
+            
+            # Normalize to prevent huge values
+            features = torch.FloatTensor([[
+                float(total_trans) / 1000.0,      # Scale down transaction count
+                float(avg_price),
+                float(unique_customers) / 100.0,  # Scale down customer count
+                float(unique_products) / 100.0    # Scale down product count
+            ]])
+            
+            print(f"    Store features: trans={total_trans}, avg_price={avg_price:.2f}, "
+                f"customers={unique_customers}, products={unique_products}")
+            
+            return features
         
-        # Aggregate store-level features
+        # Multiple stores: aggregate features (same 4 dimensions)
         features = df.groupby('store_idx').agg({
             'total_price': ['sum', 'mean'],
             'customer_idx': 'nunique',
@@ -210,8 +229,16 @@ class GraphBuilder:
         # Flatten multi-level columns
         features.columns = ['_'.join(str(col)).strip() for col in features.columns.values]
         
+        # Verify we have exactly 4 features
+        assert features.shape[1] == 4, f"Expected 4 store features, got {features.shape[1]}"
+        
         # Convert to tensor
-        return torch.FloatTensor(features.values)
+        store_features = torch.FloatTensor(features.values)
+        
+        print(f"    Store features shape: {store_features.shape} (should be [num_stores, 4])")
+        
+        return store_features
+
     
 
     def _create_edges(self, df: pd.DataFrame) -> Dict[Tuple[str, str, str], torch.Tensor]:

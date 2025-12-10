@@ -1,5 +1,0 @@
-Algorithm,Params,Silhouette,Davies-Bouldin,Calinski-Harabasz,Fraud Rate (%),Time (s)
-KMeans,"{'k': 2, 'init': 'k-means++'}",0.1679498210935636,2.018959758983204,1896.3723014302373,46.56,0.7927520275115967
-DBSCAN,"{'eps': 0.5, 'min_samples': 20}",0.0,999.0,0.0,100.0,0.14630985260009766
-IsolationForest,"{'contamination': 0.02, 'n_estimators': 100}",0.3895818878007616,3.4640857426465135,108.45762697567265,2.0,0.1594409942626953
-GMM,"{'n_components': 2, 'covariance_type': 'full'}",0.8828026809075791,0.16738635296896556,1671.315835731516,0.13,17.56612992286682

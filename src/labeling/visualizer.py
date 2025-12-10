@@ -117,16 +117,18 @@ class ClusteringVisualizer:
         
         ax.grid(True, alpha=0.3)
     
+    
     def _plot_tsne(self, X: np.ndarray, labels: np.ndarray, 
-                   fraud_mask: np.ndarray, ax):
+               fraud_mask: np.ndarray, ax):
         """t-SNE 2D projection"""
         tsne_config = self.viz_config.get('tsne', {})
         
         tsne = TSNE(
             n_components=tsne_config.get('n_components', 2),
             perplexity=tsne_config.get('perplexity', 30),
-            n_iter=tsne_config.get('n_iter', 1000),
-            random_state=tsne_config.get('random_state', 42)
+            max_iter=tsne_config.get('n_iter', 1000),  # ✅ Düzeltildi
+            random_state=tsne_config.get('random_state', 42),
+            n_jobs=-1  # ✅ Bonus: Hızlandırma
         )
         
         X_tsne = tsne.fit_transform(X)
@@ -147,13 +149,15 @@ class ClusteringVisualizer:
         # Legend
         handles = [
             plt.Line2D([0], [0], marker='o', color='w', 
-                      markerfacecolor='green', markersize=10, label='Normal'),
+                    markerfacecolor='green', markersize=10, label='Normal'),
             plt.Line2D([0], [0], marker='o', color='w', 
-                      markerfacecolor='red', markersize=10, label='Fraud')
+                    markerfacecolor='red', markersize=10, label='Fraud')
         ]
         ax.legend(handles=handles, loc='upper right')
         
         ax.grid(True, alpha=0.3)
+
+    #------
     
     def _plot_umap(self, X: np.ndarray, labels: np.ndarray, 
                    fraud_mask: np.ndarray, ax):

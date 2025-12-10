@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Tuple, Optional
 import time
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, DBSCAN, MiniBatchKMeans
 from sklearn.ensemble import IsolationForest
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
@@ -107,16 +107,28 @@ class KMeansClusterer(ClusteringAlgorithm):
         self.k = k
         self.init = init
     
+    
     def fit_predict(self, X: np.ndarray) -> np.ndarray:
         start = time.time()
         
-        self.model = KMeans(
-            n_clusters=self.k,
-            init=self.init,
-            random_state=self.config.get('random_state', 42),
-            n_init=self.config.get('n_init', 10),
-            max_iter=self.config.get('max_iter', 300)
-        )
+        # Use Mini-Batch K-Means for large datasets (>100K)
+        if len(X) > 100000:
+            self.model = MiniBatchKMeans(
+                n_clusters=self.k,
+                init=self.init,
+                random_state=self.config.get('random_state', 42),
+                batch_size=10000,
+                max_iter=self.config.get('max_iter', 100),
+                n_init=self.config.get('n_init', 3)
+            )
+        else:
+            self.model = KMeans(
+                n_clusters=self.k,
+                init=self.init,
+                random_state=self.config.get('random_state', 42),
+                n_init=self.config.get('n_init', 10),
+                max_iter=self.config.get('max_iter', 300)
+            )
         
         self.labels_ = self.model.fit_predict(X)
         self.train_time = time.time() - start
@@ -252,6 +264,9 @@ class ClusteringExperiment:
         
         return X_scaled, X
     
+
+    # --------- 12 Experiment için güncellenmiş fonksiyonlar ---------
+    
     def run_kmeans(self, X: np.ndarray) -> list:
         """Run K-Means experiments"""
         print("\n  🔵 K-Means...")
@@ -282,11 +297,12 @@ class ClusteringExperiment:
             })
             
             print(f"    k={k}: {metrics['fraud_rate']*100:.2f}% fraud, "
-                  f"sil={metrics['silhouette']:.3f}")
+                f"sil={metrics['silhouette']:.3f}")
         else:
-            # Full mode: grid search
-            for k in algo_config['k_values']:
-                init = algo_config.get('init', 'k-means++')
+            # ✅ FIXED: Use 'configs' list
+            for config_dict in algo_config['configs']:
+                k = config_dict['k']
+                init = config_dict.get('init', 'k-means++')
                 
                 clusterer = KMeansClusterer(algo_config, k=k, init=init)
                 clusterer.fit_predict(X)
@@ -301,10 +317,11 @@ class ClusteringExperiment:
                 })
                 
                 print(f"    k={k}, init={init}: {metrics['fraud_rate']*100:.2f}% fraud, "
-                      f"sil={metrics['silhouette']:.3f}")
+                    f"sil={metrics['silhouette']:.3f}")
         
         return results
-    
+
+
     def run_dbscan(self, X: np.ndarray) -> list:
         """Run DBSCAN experiments"""
         print("\n  🎯 DBSCAN...")
@@ -335,35 +352,38 @@ class ClusteringExperiment:
             })
             
             print(f"    eps={eps}, min={min_samples}: {metrics['fraud_rate']*100:.2f}% fraud, "
-                  f"sil={metrics['silhouette']:.3f}")
+                f"sil={metrics['silhouette']:.3f}")
         else:
-            # Full mode: grid search
-            for eps in algo_config['eps_values']:
-                for min_samples in algo_config['min_samples']:
-                    clusterer = DBSCANClusterer(algo_config, eps=eps, min_samples=min_samples)
-                    clusterer.fit_predict(X)
-                    metrics = clusterer.compute_metrics(X)
+            # ✅ FIXED: Use 'configs' list
+            for config_dict in algo_config['configs']:
+                eps = config_dict['eps']
+                min_samples = config_dict['min_samples']
+                
+                clusterer = DBSCANClusterer(algo_config, eps=eps, min_samples=min_samples)
+                clusterer.fit_predict(X)
+                metrics = clusterer.compute_metrics(X)
+                
+                fraud_rate = metrics['fraud_rate']
+                
+                # Only keep results in valid fraud rate range
+                fraud_rate_val = self.config['ensemble']['fraud_rate_validation']
+                if fraud_rate_val['min'] <= fraud_rate <= fraud_rate_val['max']:
+                    results.append({
+                        'algorithm': 'DBSCAN',
+                        'params': {'eps': eps, 'min_samples': min_samples},
+                        'metrics': metrics,
+                        'labels': clusterer.labels_,
+                        'fraud_mask': clusterer.get_fraud_mask()
+                    })
                     
-                    fraud_rate = metrics['fraud_rate']
-                    
-                    # Only keep results in valid fraud rate range
-                    fraud_rate_val = self.config['ensemble']['fraud_rate_validation']
-                    if fraud_rate_val['min'] <= fraud_rate <= fraud_rate_val['max']:
-                        results.append({
-                            'algorithm': 'DBSCAN',
-                            'params': {'eps': eps, 'min_samples': min_samples},
-                            'metrics': metrics,
-                            'labels': clusterer.labels_,
-                            'fraud_mask': clusterer.get_fraud_mask()
-                        })
-                        
-                        print(f"    eps={eps}, min={min_samples}: {fraud_rate*100:.2f}% fraud, "
-                              f"sil={metrics['silhouette']:.3f} ✓")
-                    else:
-                        print(f"    eps={eps}, min={min_samples}: {fraud_rate*100:.2f}% fraud (out of range)")
+                    print(f"    eps={eps}, min={min_samples}: {fraud_rate*100:.2f}% fraud, "
+                        f"sil={metrics['silhouette']:.3f} ✓")
+                else:
+                    print(f"    eps={eps}, min={min_samples}: {fraud_rate*100:.2f}% fraud (out of range)")
         
         return results
-    
+
+
     def run_isolation_forest(self, X: np.ndarray) -> list:
         """Run Isolation Forest experiments"""
         print("\n  🌲 Isolation Forest...")
@@ -395,25 +415,28 @@ class ClusteringExperiment:
             
             print(f"    cont={contamination}, n={n_estimators}: {metrics['fraud_rate']*100:.2f}% fraud")
         else:
-            # Full mode: grid search
-            for contamination in algo_config['contamination']:
-                for n_estimators in algo_config['n_estimators']:
-                    clusterer = IsolationForestClusterer(algo_config, contamination=contamination, n_estimators=n_estimators)
-                    clusterer.fit_predict(X)
-                    metrics = clusterer.compute_metrics(X)
-                    
-                    results.append({
-                        'algorithm': 'IsolationForest',
-                        'params': {'contamination': contamination, 'n_estimators': n_estimators},
-                        'metrics': metrics,
-                        'labels': clusterer.labels_,
-                        'fraud_mask': clusterer.get_fraud_mask()
-                    })
-                    
-                    print(f"    cont={contamination}, n={n_estimators}: {metrics['fraud_rate']*100:.2f}% fraud")
+            # ✅ FIXED: Use 'configs' list
+            for config_dict in algo_config['configs']:
+                contamination = config_dict['contamination']
+                n_estimators = config_dict['n_estimators']
+                
+                clusterer = IsolationForestClusterer(algo_config, contamination=contamination, n_estimators=n_estimators)
+                clusterer.fit_predict(X)
+                metrics = clusterer.compute_metrics(X)
+                
+                results.append({
+                    'algorithm': 'IsolationForest',
+                    'params': {'contamination': contamination, 'n_estimators': n_estimators},
+                    'metrics': metrics,
+                    'labels': clusterer.labels_,
+                    'fraud_mask': clusterer.get_fraud_mask()
+                })
+                
+                print(f"    cont={contamination}, n={n_estimators}: {metrics['fraud_rate']*100:.2f}% fraud")
         
         return results
-    
+
+
     def run_gmm(self, X: np.ndarray) -> list:
         """Run GMM experiments"""
         print("\n  📊 Gaussian Mixture Model...")
@@ -444,27 +467,32 @@ class ClusteringExperiment:
             })
             
             print(f"    n={n_components}, cov={covariance_type}: {metrics['fraud_rate']*100:.2f}% fraud, "
-                  f"sil={metrics['silhouette']:.3f}")
+                f"sil={metrics['silhouette']:.3f}")
         else:
-            # Full mode: grid search
-            for n_components in algo_config['n_components']:
-                for covariance_type in algo_config['covariance_type']:
-                    clusterer = GMMClusterer(algo_config, n_components=n_components, covariance_type=covariance_type)
-                    clusterer.fit_predict(X)
-                    metrics = clusterer.compute_metrics(X)
-                    
-                    results.append({
-                        'algorithm': 'GMM',
-                        'params': {'n_components': n_components, 'covariance_type': covariance_type},
-                        'metrics': metrics,
-                        'labels': clusterer.labels_,
-                        'fraud_mask': clusterer.get_fraud_mask()
-                    })
-                    
-                    print(f"    n={n_components}, cov={covariance_type}: {metrics['fraud_rate']*100:.2f}% fraud, "
-                          f"sil={metrics['silhouette']:.3f}")
+            # ✅ FIXED: Use 'configs' list
+            for config_dict in algo_config['configs']:
+                n_components = config_dict['n_components']
+                covariance_type = config_dict['covariance_type']
+                
+                clusterer = GMMClusterer(algo_config, n_components=n_components, covariance_type=covariance_type)
+                clusterer.fit_predict(X)
+                metrics = clusterer.compute_metrics(X)
+                
+                results.append({
+                    'algorithm': 'GMM',
+                    'params': {'n_components': n_components, 'covariance_type': covariance_type},
+                    'metrics': metrics,
+                    'labels': clusterer.labels_,
+                    'fraud_mask': clusterer.get_fraud_mask()
+                })
+                
+                print(f"    n={n_components}, cov={covariance_type}: {metrics['fraud_rate']*100:.2f}% fraud, "
+                    f"sil={metrics['silhouette']:.3f}")
         
         return results
+
+
+    #-----
     
     def run_all(self, df: pd.DataFrame) -> list:
         """Run all clustering algorithms"""

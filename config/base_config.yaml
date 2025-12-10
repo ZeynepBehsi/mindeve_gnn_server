@@ -120,7 +120,7 @@ compute:
 # ============================================
 test_mode:
   enabled: false  # false for full dataset
-  sample_size: 100000  # 100K for testing
+  sample_size: 5000000  # 100K for testing -> 5M' e çektim
   fast_dev_run: false
 
 
