@@ -32,11 +32,7 @@ def load_data(config: dict, sample_size: Optional[int] = None) -> pd.DataFrame:
     is_new_dataset = 'combined_sales' in data_path or 'Copy of' in data_path
     
     print(f"  Data path: {data_path}")
-    
-    # Check test mode
-    test_mode = config.get('test_mode', {}).get('enabled', False)
-    if test_mode and sample_size is None:
-        sample_size = config.get('test_mode', {}).get('sample_size', 10000)
+
     
     if sample_size:
         print(f"  Loading: {sample_size:,} rows (sample mode)")

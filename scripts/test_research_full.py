@@ -3,6 +3,16 @@ Full Research Test: GraphSAGE + 4 Clustering Methods
 Comparison and Visualization
 FIXED VERSION - Compatible with project structure
 """
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # GPU 0'ı kullan
+
+import torch
+print(f"🔍 CUDA available: {torch.cuda.is_available()}")
+print(f"🔍 CUDA device count: {torch.cuda.device_count()}")
+if torch.cuda.is_available():
+    print(f"🔍 Current device: {torch.cuda.current_device()}")
+    print(f"🔍 Device name: {torch.cuda.get_device_name(0)}")
+
 
 import sys
 import os
@@ -60,7 +70,7 @@ def main():
         # Test mode override
         config['test_mode'] = {
             'enabled': True,
-            'sample_size':  5000000
+            'sample_size':  100000
         }
         
         # ========================
@@ -70,7 +80,7 @@ def main():
         print("2️⃣  LOADING DATA")
         print("="*80)
         
-        df = load_data(config, sample_size= 5000000)
+        df = load_data(config, sample_size= 100000)
         print(f"✅ Loaded: {len(df):,} rows")
         
         print("\n" + "="*80)

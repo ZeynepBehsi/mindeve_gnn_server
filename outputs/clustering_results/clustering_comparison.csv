@@ -1,0 +1,4 @@
+Algorithm,Silhouette,Davies-Bouldin,Fraud Rate (%),Config
+KMeans,0.39573857874934076,1.1456843484286066,8.153,"{'k': 4, 'init': 'k-means++'}"
+IsolationForest,0.5820740072619879,2.3902767426054035,1.0,"{'contamination': 0.01, 'n_estimators': 100}"
+GMM,0.4021648926850805,1.7273326884067084,7.605,"{'n_components': 3, 'covariance_type': 'full'}"

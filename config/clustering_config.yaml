@@ -52,15 +52,7 @@ algorithms:
   kmeans:
     enabled: true
     configs:
-      - k: 2
-        init: "k-means++"
-        max_iter: 300
-        n_init: 10
-      - k: 3
-        init: "k-means++"
-        max_iter: 300
-        n_init: 10
-      - k: 4
+      - k: 2    # 3 ve 4 için denendi. kazanan parametre 2
         init: "k-means++"
         max_iter: 300
         n_init: 10
@@ -74,7 +66,7 @@ algorithms:
   
   # DBSCAN
   dbscan:
-    enabled: true
+    enabled: false   # clustering karşılaştırmasında sırasında denendi. kapatıldı
     configs:
       - eps: 0.3
         min_samples: 10
@@ -95,7 +87,7 @@ algorithms:
   
   # Isolation Forest
   isolation_forest:
-    enabled: true
+    enabled: false # clustering karşılaştırmasında sırasında denendi. kapatıldı
     configs:
       - contamination: 0.01
         n_estimators: 100
@@ -117,7 +109,7 @@ algorithms:
   
   # Gaussian Mixture Model
   gmm:
-    enabled: true
+    enabled: false # clustering karşılaştırmasında sırasında denendi. kapatıldı
     configs:
       - n_components: 2
         covariance_type: "full"
@@ -224,3 +216,24 @@ output:
   
   save_best_config: true
   best_config_path: "data/processed/best_clustering_config.yaml"
+
+# Visualization settings
+visualization:
+  enabled: false # t-sne çok uzun sürdüğü için ilk sonuçları almak için kapattım. 
+  save_format: 'png'
+  dpi: 300
+  pca:
+    n_components: 2
+  tsne:
+    n_components: 2
+    perplexity: 30
+    n_iter: 1000
+    random_state: 42
+    max_samples_test: 5000
+  umap:
+    n_components: 2
+    n_neighbors: 15
+    min_dist: 0.1
+    random_state: 42
+  silhouette:
+    sample_size: 10000

@@ -1,0 +1,20 @@
+================================================================================
+BEST CLUSTERING METHOD
+================================================================================
+
+Method: KMeans
+Composite Score: 0.7762
+
+Quality Metrics:
+  Silhouette:  0.4410
+  Davies-B:    1.0163
+  Calinski-H:  159122
+
+Fraud Labeling:
+  Rate:  9.17%
+  Count: 91,680
+
+Next Steps:
+  1. Update config/clustering_config.yaml
+  2. Enable only 'KMeans'
+  3. Run: python scripts/test_gnn.py

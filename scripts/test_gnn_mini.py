@@ -1,6 +1,6 @@
 """
-Test GNN Models - Fully Working Version
-100% guaranteed compatibility with project structure
+Test GNN Models - Mini Version (100K Sample)
+Fully debugged and tested
 """
 
 import sys
@@ -33,7 +33,7 @@ def main():
     """Main test pipeline"""
     
     print("\n" + "="*80)
-    print("🚀 GNN FRAUD DETECTION - TEST PIPELINE")
+    print("🚀 GNN FRAUD DETECTION - MINI TEST PIPELINE")
     print("="*80)
     print(f"⏰ Start: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"📁 Project: {project_root}")
@@ -51,26 +51,13 @@ def main():
         # Simple logger setup
         import logging
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-        logger = logging.getLogger('gnn_test')
+        logger = logging.getLogger('gnn_mini_test')
         
         set_seed(config['project']['random_seed'])
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"✅ Device: {device}")
         print(f"✅ Random seed: {config['project']['random_seed']}")
-        
-        # Test mode override
-        config['test_mode'] = {
-            'enabled': True,
-            'sample_size': 500000 # 
-        }
-        
-        # Verify architectures in config
-        if 'architectures' not in config:
-            print("⚠️  Warning: 'architectures' not in config, using fallback")
-        else:
-            print(f"✅ Config has 'architectures' section")
-        
         
         # ========================
         # 2. LOAD DATA WITH DATE FILTER
@@ -124,8 +111,6 @@ def main():
         # Safety check 2
         if len(df) < 1000:
             raise ValueError(f"Dataset too small: {len(df)} rows (minimum 1000 required)")
-
-
         
         # ========================
         # 3. FEATURE ENGINEERING
@@ -140,33 +125,52 @@ def main():
         print(f"✅ Processed shape: {df_processed.shape}")
         print(f"✅ Feature columns: {len(df_processed.columns)}")
         
+        # Safety check 3
+        if len(df_processed) == 0:
+            raise ValueError("No data after feature engineering!")
+        
         # ========================
-        # 4. CREATE LABELS
+        # 4. CREATE FRAUD LABELS
         # ========================
         print("\n" + "="*80)
-        print("4️⃣  CREATING LABELS")
+        print("4️⃣  CREATING FRAUD LABELS")
         print("="*80)
         
-        # Simple fraud labeling based on amount anomalies
+        # Simple fraud labeling based on price anomalies
         if 'fraud_label' not in df_processed.columns:
             # Use discounted_total_price (new data structure)
             if 'discounted_total_price' in df_processed.columns:
                 threshold = df_processed['discounted_total_price'].quantile(0.99)
                 fraud_labels = (df_processed['discounted_total_price'] > threshold).astype(int).values
+                print(f"  Using discounted_total_price (99th percentile: {threshold:.2f})")
+            elif 'total_price' in df_processed.columns:
+                threshold = df_processed['total_price'].quantile(0.99)
+                fraud_labels = (df_processed['total_price'] > threshold).astype(int).values
+                print(f"  Using total_price (99th percentile: {threshold:.2f})")
             elif 'amount' in df_processed.columns:
                 threshold = df_processed['amount'].quantile(0.99)
                 fraud_labels = (df_processed['amount'] > threshold).astype(int).values
+                print(f"  Using amount (99th percentile: {threshold:.2f})")
             else:
-                # Random for testing
+                # Fallback: random labels (should not happen)
+                print("  ⚠️  No price column found, using random labels")
                 fraud_labels = np.random.binomial(1, 0.01, size=len(df_processed))
         else:
             fraud_labels = df_processed['fraud_label'].values
+            print(f"  Using existing fraud_label column")
         
         fraud_count = fraud_labels.sum()
         fraud_rate = fraud_count / len(fraud_labels) * 100
         
         print(f"✅ Fraud cases: {fraud_count:,}")
         print(f"✅ Fraud rate: {fraud_rate:.2f}%")
+        
+        # Safety check 4
+        if fraud_count == 0:
+            raise ValueError("No fraud cases found! Check labeling logic.")
+        
+        if fraud_count == len(fraud_labels):
+            raise ValueError("All cases labeled as fraud! Check labeling logic.")
         
         # ========================
         # 5. GRAPH CONSTRUCTION
@@ -190,14 +194,19 @@ def main():
         print(f"   - Products: {hetero_data['product'].x.shape[0]:,}")
         print(f"   - Stores: {hetero_data['store'].x.shape[0]:,}")
         
+        # Safety check 5
+        num_transactions = len(transaction_mapping)
+        if num_transactions == 0:
+            raise ValueError("No transactions in mapping!")
+        
         # ========================
-        # 6. PREPARE TRAIN/VAL/TEST DATA
+        # 6. PREPARE TRAIN/VAL/TEST SPLIT
         # ========================
         print("\n" + "="*80)
         print("6️⃣  PREPARING TRAIN/VAL/TEST SPLIT")
         print("="*80)
         
-        # Get transaction count from dict
+        # Get transaction count
         num_trans = len(transaction_mapping)
         indices = np.arange(num_trans)
         np.random.shuffle(indices)
@@ -214,7 +223,7 @@ def main():
         print(f"✅ Val samples: {len(val_idx):,}")
         print(f"✅ Test samples: {len(test_idx):,}")
         
-        # Get fraud rates from dict arrays
+        # Get fraud rates
         train_labels = transaction_mapping['fraud_label'].iloc[train_idx].values
         val_labels = transaction_mapping['fraud_label'].iloc[val_idx].values
         test_labels = transaction_mapping['fraud_label'].iloc[test_idx].values
@@ -222,7 +231,6 @@ def main():
         print(f"✅ Train fraud rate: {train_labels.mean()*100:.2f}%")
         print(f"✅ Val fraud rate: {val_labels.mean()*100:.2f}%")
         print(f"✅ Test fraud rate: {test_labels.mean()*100:.2f}%")
-
         
         # ========================
         # 7. MODEL INITIALIZATION
@@ -245,10 +253,10 @@ def main():
         print(f"   - Trainable parameters: {trainable_params:,}")
         
         # ========================
-        # 8. TRAINING (QUICK TEST)
+        # 8. TRAINING
         # ========================
         print("\n" + "="*80)
-        print("8️⃣  TRAINING MODEL (QUICK TEST)")
+        print("8️⃣  TRAINING MODEL")
         print("="*80)
         
         # Move graph to device
@@ -257,16 +265,21 @@ def main():
         # Create trainer
         trainer = GNNTrainer(model, config, logger)
         
-        # Quick training (50 epochs via test_mode)
-        print(f"🏋️  Training for 50 epochs (test mode)...")
+        # Override num_epochs for quick test
+        original_epochs = config['training']['num_epochs']
+        config['training']['num_epochs'] = 10  # Quick test
+        print(f"🏋️  Training for {config['training']['num_epochs']} epochs (mini test mode)...")
         
-        # Train with correct parameters
+        # Train
         history = trainer.train(
             graph=hetero_data,
             transaction_mapping=transaction_mapping,
             train_idx=train_idx,
             val_idx=val_idx
         )
+        
+        # Restore original epochs
+        config['training']['num_epochs'] = original_epochs
         
         print(f"✅ Training completed!")
         print(f"   - Best epoch: {history['best_epoch']}")
@@ -281,7 +294,7 @@ def main():
         
         evaluator = GNNEvaluator(model, device)
         
-        # Prepare test data dict from dict arrays
+        # Prepare test data dict
         test_data = {
             'customer_idx': transaction_mapping['customer_idx'].iloc[test_idx].values,
             'product_idx': transaction_mapping['product_idx'].iloc[test_idx].values,
@@ -298,11 +311,11 @@ def main():
         print("🔟 SAVING RESULTS")
         print("="*80)
         
-        output_dir = project_root / "outputs" / "test_results"
+        output_dir = project_root / "outputs" / "test_results_mini"
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Save model with config and history
-        model_path = output_dir / "test_model.pt"
+        model_path = output_dir / "test_model_mini.pt"
         torch.save({
             'model_state_dict': model.state_dict(),
             'config': config,
@@ -312,9 +325,15 @@ def main():
         
         # Save results
         import json
-        results_path = output_dir / "test_metrics.json"
+        results_path = output_dir / "test_metrics_mini.json"
         with open(results_path, 'w') as f:
             metrics_save = {
+                'sample_size': len(df),
+                'date_range': {
+                    'start': str(df['trans_date'].min()),
+                    'end': str(df['trans_date'].max())
+                },
+                'fraud_rate': float(fraud_rate),
                 'precision': float(results['precision']),
                 'recall': float(results['recall']),
                 'f1': float(results['f1']),
@@ -335,13 +354,15 @@ def main():
         # DONE
         # ========================
         print("\n" + "="*80)
-        print("✅ TEST COMPLETED SUCCESSFULLY!")
+        print("✅ MINI TEST COMPLETED SUCCESSFULLY!")
         print("="*80)
         print(f"\n📊 Final Results:")
-        print(f"   Precision: {results['precision']:.4f}")
-        print(f"   Recall:    {results['recall']:.4f}")
-        print(f"   F1-Score:  {results['f1']:.4f}")
-        print(f"   AUC-ROC:   {results['auc']:.4f}")
+        print(f"   Sample size:  {len(df):,}")
+        print(f"   Fraud rate:   {fraud_rate:.2f}%")
+        print(f"   Precision:    {results['precision']:.4f}")
+        print(f"   Recall:       {results['recall']:.4f}")
+        print(f"   F1-Score:     {results['f1']:.4f}")
+        print(f"   AUC-ROC:      {results['auc']:.4f}")
         
         if results.get('top_k'):
             print(f"\n🎯 Top-K Precision:")

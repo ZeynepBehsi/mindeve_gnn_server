@@ -111,17 +111,33 @@ class KMeansClusterer(ClusteringAlgorithm):
     def fit_predict(self, X: np.ndarray) -> np.ndarray:
         start = time.time()
         
-        # Use Mini-Batch K-Means for large datasets (>100K)
+        # ✅ YENİ: Büyük veri setlerinde sampling yap
         if len(X) > 100000:
-            self.model = MiniBatchKMeans(
+            print(f"    📊 Large dataset: {len(X):,} samples")
+            print(f"    ⚡ Using sampling for speed...")
+            
+            # Sample %30'unu al
+            sample_size = min(50000, int(len(X) * 0.3))
+            sample_idx = np.random.choice(len(X), sample_size, replace=False)
+            X_sample = X[sample_idx]
+            
+            print(f"    📉 Training on {sample_size:,}, predicting on {len(X):,}")
+            
+            # Normal KMeans ile sample'da train et
+            self.model = KMeans(
                 n_clusters=self.k,
                 init=self.init,
                 random_state=self.config.get('random_state', 42),
-                batch_size=10000,
-                max_iter=self.config.get('max_iter', 100),
-                n_init=self.config.get('n_init', 3)
+                n_init=3,
+                max_iter=100,
+                algorithm='elkan'  # Daha hızlı
             )
+            
+            self.model.fit(X_sample)
+            self.labels_ = self.model.predict(X)  # Tüm data'ya predict
+            
         else:
+            # Küçük data için normal KMeans
             self.model = KMeans(
                 n_clusters=self.k,
                 init=self.init,
@@ -129,11 +145,13 @@ class KMeansClusterer(ClusteringAlgorithm):
                 n_init=self.config.get('n_init', 10),
                 max_iter=self.config.get('max_iter', 300)
             )
+            self.labels_ = self.model.fit_predict(X)
         
-        self.labels_ = self.model.fit_predict(X)
         self.train_time = time.time() - start
         
         return self.labels_
+
+
     
     def get_fraud_mask(self) -> np.ndarray:
         """Smallest cluster is fraud"""
@@ -142,25 +160,52 @@ class KMeansClusterer(ClusteringAlgorithm):
         return (self.labels_ == fraud_cluster).astype(int)
 
 
+
 class DBSCANClusterer(ClusteringAlgorithm):
     """DBSCAN clustering"""
     
     def __init__(self, config: dict, eps: float = 0.5, min_samples: int = 20):
-        super().__init__(f"DBSCAN_eps{eps}_min{min_samples}", config)
+        # ✅ FIX: Önce kendi parametrelerini kaydet
         self.eps = eps
         self.min_samples = min_samples
+        # ✅ Sonra parent'ı initialize et
+        super().__init__(f"DBSCAN_eps{eps}_min{min_samples}", config)
     
     def fit_predict(self, X: np.ndarray) -> np.ndarray:
         start = time.time()
         
-        self.model = DBSCAN(
-            eps=self.eps,
-            min_samples=self.min_samples,
-            metric=self.config.get('metric', 'euclidean'),
-            n_jobs=self.config.get('n_jobs', -1)
-        )
+        # ✅ YENİ: DBSCAN için sampling
+        if len(X) > 100000:
+            print(f"    ⚡ DBSCAN sampling: {len(X):,} -> 50,000")
+            sample_size = 50000
+            sample_idx = np.random.choice(len(X), sample_size, replace=False)
+            X_sample = X[sample_idx]
+            
+            self.model = DBSCAN(
+                eps=self.eps,
+                min_samples=self.min_samples,
+                metric=self.config.get('metric', 'euclidean'),
+                n_jobs=-1
+            )
+            
+            # Sample'da fit et
+            labels_sample = self.model.fit_predict(X_sample)
+            
+            # Tüm data için nearest neighbor ile label ata
+            from sklearn.neighbors import NearestNeighbors
+            nbrs = NearestNeighbors(n_neighbors=1, n_jobs=-1).fit(X_sample)
+            distances, indices = nbrs.kneighbors(X)
+            self.labels_ = labels_sample[indices.flatten()]
+            
+        else:
+            self.model = DBSCAN(
+                eps=self.eps,
+                min_samples=self.min_samples,
+                metric=self.config.get('metric', 'euclidean'),
+                n_jobs=self.config.get('n_jobs', -1)
+            )
+            self.labels_ = self.model.fit_predict(X)
         
-        self.labels_ = self.model.fit_predict(X)
         self.train_time = time.time() - start
         
         return self.labels_
@@ -168,6 +213,7 @@ class DBSCANClusterer(ClusteringAlgorithm):
     def get_fraud_mask(self) -> np.ndarray:
         """Outliers (-1) are fraud"""
         return (self.labels_ == -1).astype(int)
+
 
 
 class IsolationForestClusterer(ClusteringAlgorithm):
@@ -208,20 +254,45 @@ class GMMClusterer(ClusteringAlgorithm):
         self.n_components = n_components
         self.covariance_type = covariance_type
     
+
     def fit_predict(self, X: np.ndarray) -> np.ndarray:
         start = time.time()
         
-        self.model = GaussianMixture(
-            n_components=self.n_components,
-            covariance_type=self.covariance_type,
-            n_init=self.config.get('n_init', 10),
-            random_state=self.config.get('random_state', 42)
-        )
+        # ✅ YENİ: GMM sampling
+        if len(X) > 100000:
+            print(f"    ⚡ GMM sampling: {len(X):,} -> 50,000")
+            sample_size = 50000
+            sample_idx = np.random.choice(len(X), sample_size, replace=False)
+            X_sample = X[sample_idx]
+            
+            self.model = GaussianMixture(
+                n_components=self.n_components,
+                covariance_type=self.covariance_type,
+                n_init=3,
+                max_iter=100,
+                random_state=self.config.get('random_state', 42)
+            )
+            
+            self.model.fit(X_sample)
+            self.labels_ = self.model.predict(X)
+            
+        else:
+            self.model = GaussianMixture(
+                n_components=self.n_components,
+                covariance_type=self.covariance_type,
+                n_init=self.config.get('n_init', 10),
+                random_state=self.config.get('random_state', 42)
+            )
+            self.labels_ = self.model.fit_predict(X)
         
-        self.labels_ = self.model.fit_predict(X)
         self.train_time = time.time() - start
         
         return self.labels_
+
+
+
+
+
     
     def get_fraud_mask(self) -> np.ndarray:
         """Smallest cluster is fraud"""

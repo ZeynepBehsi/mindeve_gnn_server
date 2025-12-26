@@ -11,14 +11,14 @@ model:
   type: "GraphSAGE"  # Options: GraphSAGE, GAT, GCN
   
   # Hidden dimensions
-  hidden_channels: 64
-  num_layers: 2
+  hidden_channels: 128  # 64 → 128 (model kapasitesi artır)
+  num_layers: 3  # 2 → 3 (daha derin)
   
   # Aggregation method for GraphSAGE
   aggr: "mean"  # Options: mean, max, sum
   
   # Dropout for regularization
-  dropout: 0.3
+  dropout: 0.2  # 0.1 → 0.2 (biraz regularization)
   
   # Activation function
   activation: "relu"  # Options: relu, leaky_relu, elu
@@ -29,9 +29,9 @@ model:
 # Model architecture configurations (for different GNN types)
 architectures:
   sage:
-    hidden_channels: 64
-    num_layers: 2
-    dropout: 0.3
+    hidden_channels: 128 # 64'den 128'e çıkardım
+    num_layers: 3 # 2'den 3'e çıkardım
+    dropout: 0.3  # 0.1'den artırdım
     aggregation: "mean"  # Options: mean, max, sum
   
   gat:
@@ -51,24 +51,29 @@ architectures:
 # Training configuration
 training:
   # Number of epochs
-  num_epochs: 50  # Increased from 10 (low fraud rate needs more training)
+  num_epochs: 50  # 50'den 100'e çıkardım - geri 50'ye indirdim
   
   # Batch size
-  batch_size: 1024  # Increased from 512 (larger batches for stability)
+  batch_size: 512  # Increased from 512 (larger batches for stability)
   
   # Learning rate
-  learning_rate: 0.001
+  learning_rate: 0.0001 #clustering comparison sonrası 0.001'den 0.0001 'e düşürdüm
   
   # Learning rate scheduler
   lr_scheduler:
     enabled: true
-    type: "cosine_with_warmup"  # Options: cosine_with_warmup, step, exponential
+    type: "reduce_on_plateau"  # "cosine_with_warmup'den değiştirdim-basitleştirmek için
+    plateau: # parametrelerini ekledim
+      mode: "min"
+      factor: 0.5
+      patience: 5
+      min_lr: 0.00001
     
     # Warmup configuration
     warmup:
-      epochs: 5
-      start_lr: 0.0001
-      end_lr: 0.001
+      epochs: 10 # 5 → 10 (daha uzun warmup)
+      start_lr: 0.00005 # 0.0001 'den 0.00005'
+      end_lr: 0.0005   # 0.001 --> 0.0005 
     
     # Cosine annealing
     cosine:
@@ -77,7 +82,7 @@ training:
     
     # Warm restarts
     warm_restarts:
-      enabled: true
+      enabled: false # KAPAttım (oscillation yaratıyor) 
       T_0: 10
       T_mult: 2
   
@@ -92,26 +97,26 @@ training:
   
   # Loss function
   loss:
-    type: "focal"  # Options: focal, cross_entropy, weighted_cross_entropy
+    type: "weighted_cross_entropy"  # focal → cross_entropy ve ardından en son "weighted_cross_entropy" kullandım.
     
     # Focal loss parameters (for extreme class imbalance)
     focal:
-      alpha: 0.75  # Weight for positive class (fraud)
-      gamma: 3.0   # Focusing parameter (increased from 2.0)
+      alpha: 0.85  # 0.75'den 0.85'e --> (fraud'a daha fazla ağırlık)
+      gamma: 4.0   # 3.0 → 4.0 (zor örneklere odaklan)
     
     # Class weights (if using weighted_cross_entropy)
     class_weights:
       normal: 1.0
-      fraud: 30.0  # Increased from 20.0 (for lower fraud rate)
+      fraud: 20.0  # 100 → 10 (aşırı weighting kaldır) - sonra 20'ye çıkardım.
   
   # Data balancing
   data_balancing:
     enabled: true
-    method: "smote_enn"  # Options: smote, smote_enn, adasyn, none
+    method: "smote_enn"  # Options: smote, smote_enn, adasyn, none --> final decision is smote enn
     
     # SMOTE parameters
     smote:
-      sampling_strategy: 0.50  # Increased from 0.30 (more aggressive balancing)
+      sampling_strategy: 0.50  # 0.70 → 0.50 (biraz düşürdüm, %50 yeterli)
       k_neighbors: 5
       random_state: 42
     
@@ -123,7 +128,7 @@ training:
   # Early stopping
   early_stopping:
     enabled: true
-    patience: 15
+    patience: 20 # 15'den 25'e çıkardım - sonra 20Ye düşürdüm
     min_delta: 0.001
     monitor: "val_loss"  # Options: val_loss, val_f1, val_auc
     mode: "min"  # Options: min, max

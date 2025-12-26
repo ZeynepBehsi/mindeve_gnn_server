@@ -7,7 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, ReduceLROnPlateau
 import numpy as np
-import pandas as pd
 from typing import Dict, List, Tuple
 import time
 from pathlib import Path
@@ -270,81 +269,7 @@ class GNNTrainer:
         self.model = self.model.to(self.device)
         graph = graph.to(self.device)
         
-        # ================================================================
-        # SMOTE-ENN BALANCING (Transaction Level)
-        # ================================================================
-        if self.use_smote:
-            if self.logger:
-                self.logger.info("Applying SMOTE-ENN at transaction level...")
-            
-            # Original indices and labels
-            original_fraud_count = transaction_mapping.loc[train_idx, 'fraud_label'].sum()
-            original_fraud_rate = transaction_mapping.loc[train_idx, 'fraud_label'].mean()
-            
-            print(f"\n  📊 SMOTE-ENN Balancing:")
-            print(f"    Original: {len(train_idx):,} samples, {original_fraud_count:,} fraud ({original_fraud_rate*100:.2f}%)")
-            
-            # Create feature matrix: concatenate customer_idx, product_idx, store_idx
-            X_features = np.column_stack([
-                transaction_mapping.loc[train_idx, 'customer_idx'].values,
-                transaction_mapping.loc[train_idx, 'product_idx'].values,
-                transaction_mapping.loc[train_idx, 'store_idx'].values
-            ])
-            y_labels = transaction_mapping.loc[train_idx, 'fraud_label'].values
-            
-            # Apply SMOTE-ENN
-            try:
-                X_resampled, y_resampled = self._balance_data(X_features, y_labels)
-                
-                # Calculate new statistics
-                new_fraud_count = y_resampled.sum()
-                new_fraud_rate = y_resampled.mean()
-                
-                print(f"    Resampled: {len(y_resampled):,} samples, {new_fraud_count:,} fraud ({new_fraud_rate*100:.2f}%)")
-                
-                # Create new mapping for resampled data
-                resampled_train_idx = []
-                
-                for i, features in enumerate(X_resampled):
-                    # Find closest original transaction
-                    distances = np.sum((X_features - features)**2, axis=1)
-                    closest_idx = np.argmin(distances)
-                    resampled_train_idx.append(train_idx[closest_idx])
-                
-                resampled_train_idx = np.array(resampled_train_idx)
-                
-                # Create resampled DataFrame
-                resampled_rows = []
-                for idx, label in zip(resampled_train_idx, y_resampled):
-                    row = transaction_mapping.loc[idx].copy()
-                    row['fraud_label'] = label
-                    resampled_rows.append(row)
-                
-                resampled_df = pd.DataFrame(resampled_rows).reset_index(drop=True)
-                
-                # Keep validation data unchanged
-                val_df = transaction_mapping.loc[val_idx].copy().reset_index(drop=True)
-                val_df.index = val_df.index + len(resampled_df)  # Offset indices
-                
-                # Update indices
-                train_idx = np.arange(len(resampled_df))
-                val_idx = val_df.index.values
-                
-                # Concatenate
-                transaction_mapping = pd.concat([resampled_df, val_df], ignore_index=True)
-                
-                if self.logger:
-                    self.logger.info(f"SMOTE-ENN completed: {len(train_idx):,} samples, fraud rate {new_fraud_rate*100:.2f}%")
-                
-            except Exception as e:
-                print(f"    ⚠️  SMOTE-ENN failed: {e}")
-                print(f"    ⚠️  Continuing with original data...")
-                if self.logger:
-                    self.logger.warning(f"SMOTE-ENN failed: {e}. Using original data.")
-        
-        # ================================================================
-        # PREPARE TRAINING DATA
-        # ================================================================
+        # Prepare training data
         train_cust_idx = torch.LongTensor(
             transaction_mapping.loc[train_idx, 'customer_idx'].values
         ).to(self.device)
@@ -466,7 +391,7 @@ class GNNTrainer:
                 # Metrics
                 from sklearn.metrics import f1_score, roc_auc_score
                 val_f1 = f1_score(val_labels_np, predictions, zero_division=0)
-                val_auc = roc_auc_score(val_labels_np, proba) if len(np.unique(val_labels_np)) > 1 else 0.5
+                val_auc = roc_auc_score(val_labels_np, proba)
             
             # ================================================================
             # LR SCHEDULING
